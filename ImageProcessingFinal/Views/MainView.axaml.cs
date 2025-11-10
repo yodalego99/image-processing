@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Avalonia;
@@ -22,14 +23,14 @@ public partial class MainView : UserControl
         InitializeComponent();
         pictureBox1 = PictureBox1;
         pictureBox2 = PictureBox2;
-        //trackBar1 = TrackBar1;
+        trackBar1 = TrackBar1;
     }
 
     private static WriteableBitmap CreateBitmapFromPixelData(byte[] rgbPixelData, int width, int height)
     {
         // Standard - maybe it needs to be changed on some devices
         Vector dpi = new Vector(96, 96);
-        var bitmap = new WriteableBitmap(new PixelSize(width, height), dpi, Avalonia.Platform.PixelFormat.Rgba8888);
+        var bitmap = new WriteableBitmap(new PixelSize(width, height), dpi, Avalonia.Platform.PixelFormat.Rgb32);
         using (var frameBuffer = bitmap.Lock())
         {
             Marshal.Copy(rgbPixelData, 0, frameBuffer.Address, rgbPixelData.Length);
@@ -44,114 +45,86 @@ public partial class MainView : UserControl
         VideoCapture? SelectedVideoFile; // kiválasztott videó (felhasználó adja meg)
         VideoCapture? WebCamVideo; // webkamera videója
         VideoCapture? ExportedVideoFile; // visszajátszásmiatt van // később át lesz írva
-        //Mat WebCamFrame = Mat.Zeros(1, 1, DepthType.Cv8U, 3); // webkamera videóinak képkockája
+        Image<Rgba, Byte> WebCamFrame; // webkamera videóinak képkockája
         bool IsWebcamBackgroundRemovalOn = false; // jelzi, hogy be van-e kapcsolva a webkamera háttérleválasztása
         bool IsFirstFrame = false; // ellenőrzi, hogy a kikért képkocka az első-e a webkamerának
         bool IsPlaying = false; // jelzi, hogy lejátszódik-e éppen a videó
         bool IsExported = false; // jelzi, hogy megtörtént-e már a videón a háttérleválasztás
         int TotalFrames; // videó képkockáinak a száma
         int CurrentFrameNumber; // jelenlegi képkocka sorszáma (kiválasztott videóban melyik képkockánál tart)
-        //Mat CurrentFrame = Mat.Zeros(1, 1, DepthType.Cv8U, 3); // jelenlegi frame Mat típusú képe
-        //Mat ExportedCurrentFrame = Mat.Zeros(1, 1, DepthType.Cv8U, 3); // kiexportált képkocka - videó exportálásánál használjuk 
+        Image<Rgba, Byte> CurrentFrame; // jelenlegi frame Mat típusú képe
+        Image<Rgba, Byte> ExportedCurrentFrame; // kiexportált képkocka - videó exportálásánál használjuk 
         int FPS; // FPS - képkocka másodpercenként - meghatározza, hogy milyen gyorsan legyenek lejátszva a képkockák - videó sebessége
         string? VideoFileName = string.Empty; // kiválasztott videófájl neve
 
-        private void VideoSelectButton_Click(object? sender, EventArgs e)
+        private async void PlayVideoFile()
         {
-            //StopButton_Click(sender, e);
-            //ToolStripMenuReset();
-            //VideoCaptureRemover();
-            var topLEvel = TopLevel.GetTopLevel(this);
-            var OpenVideoFile = topLEvel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "Open video...",
-                AllowMultiple = false,
-                FileTypeFilter =
-                {
-                    
-                }
-            });
-            pictureBox1.Source = null; pictureBox2.Source = null;
-            WebCamVideo = null;
-            IsExported = false;
-            if (OpenVideoFile.IsCompleted)
-            {
-                SelectedVideoFile = new VideoCapture(OpenVideoFile.Result[0].Name);
-                TotalFrames = Convert.ToInt32(SelectedVideoFile.Get(CapProp.FrameCount));
-                FPS = Convert.ToInt32(SelectedVideoFile.Get(CapProp.Fps));
-                //CurrentFrame = new Mat();
-                CurrentFrameNumber = 0;
-                trackBar1.Minimum = 0;
-                trackBar1.Maximum = TotalFrames;
-                trackBar1.Value = 0;
-                VideoFileName = Path.GetFileNameWithoutExtension(OpenVideoFile.Result[0].Name);
-                pictureBox1.Source = null; 
-                //PlayVideoFile(); 
-            }
-        }
-
-        /*private async void PlayVideoFile()
-        {
-            if (SelectedVideoFile == null)
-            {
-                return;
-            }
-
             try
             {
-                while (IsPlaying && CurrentFrameNumber < TotalFrames)
+                if (SelectedVideoFile == null)
                 {
-                    SelectedVideoFile.Set(CapProp.PosFrames, CurrentFrameNumber);
-                    SelectedVideoFile.Read(CurrentFrame);
-                    if (IsExported && ExportedVideoFile != null)
+                    return;
+                }
+
+                try
+                {
+                    while (IsPlaying && CurrentFrameNumber < TotalFrames)
                     {
-                        ExportedVideoFile.Set(CapProp.PosFrames, CurrentFrameNumber);
-                        ExportedVideoFile.Read(ExportedCurrentFrame);
-                        pictureBox2.Source = ExportedCurrentFrame.ToBitmap();
+                        SelectedVideoFile.Set(CapProp.PosMsec, Convert.ToDouble(CurrentFrameNumber)*(1000.0/Convert.ToDouble(FPS)));
+                        CurrentFrame = SelectedVideoFile.QueryFrame().ToImage<Rgba, Byte>();
+                        if (IsExported && ExportedVideoFile != null)
+                        {
+                            ExportedVideoFile.Set(CapProp.PosFrames, CurrentFrameNumber);
+                            ExportedVideoFile.Read(ExportedCurrentFrame);
+                            pictureBox2.Source = CreateBitmapFromPixelData(ExportedCurrentFrame.Bytes, ExportedCurrentFrame.Width, ExportedCurrentFrame.Height);
+                        }
+                        pictureBox1.Source = CreateBitmapFromPixelData(CurrentFrame.Bytes, CurrentFrame.Width, CurrentFrame.Height);
+                        trackBar1.Value = CurrentFrameNumber;
+                        CurrentFrameNumber++;
+                        await Task.Delay(1000 / FPS);
                     }
-                    pictureBox1.Source = CurrentFrame.ToBitmap();
-                    GC.Collect();
-                    trackBar1.Value = CurrentFrameNumber;
-                    CurrentFrameNumber++;
-                    await Task.Delay(1000 / FPS);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
                 }
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                MessageBox.Show(ex.Message);
+                Console.WriteLine(e.Message);
             }
         }
 
-        private void PlayButton_Click(object sender, EventArgs e)
+        private void PlayButton_Click(object sender, RoutedEventArgs e)
         {
             if (SelectedVideoFile != null)
             {
                 if (IsPlaying)
                 {
                     IsPlaying = false;
-                    playButton.BackgroundImage = ((System.Drawing.Source)(Properties.Resources.pause_button_1149586));
+                    //playButton.BackgroundImage = ((System.Drawing.Source)(Properties.Resources.pause_button_1149586));
                 }
                 else
                 {
                     IsPlaying = true;
                     PlayVideoFile();
-                    playButton.BackgroundImage = ((System.Drawing.Source)(Properties.Resources.play_button_11495842));
+                    //playButton.BackgroundImage = ((System.Drawing.Source)(Properties.Resources.play_button_11495842));
                 }
             }
         }
 
-        private void StopButton_Click(object sender, EventArgs e)
+        private void StopButton_Click(object sender, RoutedEventArgs e)
         {
             IsPlaying = false;
             CurrentFrameNumber = 0;
             trackBar1.Value = 0;
             pictureBox1.Source = null;
-            pictureBox1.Invalidate();
+            //pictureBox1.Invalidate();
             pictureBox2.Source = null;
-            pictureBox2.Invalidate();
+            //pictureBox2.Invalidate();
         }
 
-        private void VideoFrameExportButton_Click(object sender, EventArgs e)
+        /*private void VideoFrameExportButton_Click(object sender, EventArgs e)
         {
             ToolStripMenuReset();
             StopButton_Click(sender, e);
@@ -678,9 +651,9 @@ public partial class MainView : UserControl
                 IsWebcamBackgroundRemovalOn = true;
             }
         }*/
-        private async void MenuItem_OnClick(object? sender, RoutedEventArgs e)
+        private async void VideoSelect_Click(object? sender, RoutedEventArgs e)
         {
-            //StopButton_Click(sender, e);
+            StopButton_Click(sender, e);
             //ToolStripMenuReset();
             //VideoCaptureRemover();
             var topLevel = TopLevel.GetTopLevel(this);
@@ -698,17 +671,17 @@ public partial class MainView : UserControl
             IsExported = false;
             if (OpenVideoFile.Count >= 1)
             {
-                //SelectedVideoFile = new VideoCapture(OpenVideoFile[0].Name);
-                //TotalFrames = Convert.ToInt32(SelectedVideoFile.Get(CapProp.FrameCount));
-                //FPS = Convert.ToInt32(SelectedVideoFile.Get(CapProp.Fps));
-                //CurrentFrame = new Mat();
+                SelectedVideoFile = new VideoCapture(OpenVideoFile[0].Path.AbsoluteUri);
+                TotalFrames = Convert.ToInt32(SelectedVideoFile.Get(CapProp.FrameCount));
+                FPS = Convert.ToInt32(SelectedVideoFile.Get(CapProp.Fps));
+                CurrentFrame = SelectedVideoFile.QueryFrame().ToImage<Rgba, Byte>();
                 CurrentFrameNumber = 0;
-                //trackBar1.Minimum = 0;
-                //trackBar1.Maximum = TotalFrames;
-                //trackBar1.Value = 0;
-                //VideoFileName = Path.GetFileNameWithoutExtension(OpenVideoFile[0].Name);
-                pictureBox1.Source = new Bitmap(OpenVideoFile[0].Path.AbsolutePath); 
-                //PlayVideoFile(); 
+                trackBar1.Minimum = 0;
+                trackBar1.Maximum = TotalFrames;
+                trackBar1.Value = 0;
+                VideoFileName = OpenVideoFile[0].Name;
+                pictureBox1.Source = CreateBitmapFromPixelData(CurrentFrame.Bytes, CurrentFrame.Width, CurrentFrame.Height); 
+                PlayVideoFile(); 
             }
         }
 }

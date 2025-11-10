@@ -17,7 +17,7 @@
             <MenuItem Header="_File">
                 <MenuItem Header="Open _image..."></MenuItem>
                 <MenuItem Header="Paste image..."></MenuItem>
-                <MenuItem Header="Open _video..." Click="MenuItem_OnClick" ></MenuItem>
+                <MenuItem Header="Open _video..." Click="VideoSelect_Click" ></MenuItem>
                 <MenuItem Header="Open _webcam..."></MenuItem>
                 <Separator></Separator>
                 <MenuItem Header="Save image..."></MenuItem>
@@ -41,8 +41,8 @@
             <Slider Name="TrackBar1" Margin=" 10, 0"></Slider>
         </Panel>
         <WrapPanel Grid.Row="3" Grid.RowSpan="1" Grid.Column="0" Grid.ColumnSpan="2" HorizontalAlignment="Center">
-            <Button>Play</Button>
-            <Button>Pause</Button>
+            <Button Click="PlayButton_Click">Play</Button>
+            <Button Click="StopButton_Click">Pause</Button>
             <Button>Stop</Button>
         </WrapPanel>
     </Grid>

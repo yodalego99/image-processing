@@ -21,11 +21,10 @@
         </PackageReference>
         <PackageReference Include="CommunityToolkit.Mvvm"/>
         <PackageReference Include="Emgu.CV" />
-        <PackageReference Include="Emgu.CV.runtime.mini.debian-arm" />
-        <PackageReference Include="Emgu.CV.runtime.mini.debian-arm64" />
-        <PackageReference Include="Emgu.CV.runtime.mini.macos" />
-        <PackageReference Include="Emgu.CV.runtime.mini.ubuntu-x64" />
+        <PackageReference Include="Emgu.CV.runtime.debian-arm" />
+        <PackageReference Include="Emgu.CV.runtime.debian-arm64" />
         <PackageReference Include="Emgu.CV.runtime.mini.uwp" />
-        <PackageReference Include="Emgu.CV.runtime.mini.windows" />
+        <PackageReference Include="Emgu.CV.runtime.ubuntu-x64" />
+        <PackageReference Include="Emgu.CV.runtime.windows" />
     </ItemGroup>
 </Project>
