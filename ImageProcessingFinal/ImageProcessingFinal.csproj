@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <AvaloniaResource Include="Assets\**"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Avalonia"/>
+        <PackageReference Include="Avalonia.Themes.Fluent"/>
+        <PackageReference Include="Avalonia.Fonts.Inter"/>
+        <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
+        <PackageReference Include="Avalonia.Diagnostics">
+            <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+            <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="CommunityToolkit.Mvvm"/>
+        <PackageReference Include="Emgu.CV" />
+        <PackageReference Include="Emgu.CV.runtime.mini.debian-arm" />
+        <PackageReference Include="Emgu.CV.runtime.mini.debian-arm64" />
+        <PackageReference Include="Emgu.CV.runtime.mini.macos" />
+        <PackageReference Include="Emgu.CV.runtime.mini.ubuntu-x64" />
+        <PackageReference Include="Emgu.CV.runtime.mini.uwp" />
+        <PackageReference Include="Emgu.CV.runtime.mini.windows" />
+    </ItemGroup>
+</Project>
