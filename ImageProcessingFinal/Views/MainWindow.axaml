@@ -6,7 +6,7 @@
         xmlns:views="using:ImageProcessingFinal.Views"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="ImageProcessingFinal.Views.MainWindow"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/image.ico"
         Title="ImageProcessingFinal">
         <views:MainView />
 </Window>
