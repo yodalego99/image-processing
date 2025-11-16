@@ -66,9 +66,13 @@ public partial class MainView : UserControl
     {
         try
         {
-            if (SelectedVideoFile?.Video == null)
+            if (SelectedVideoFile?.Video == null && SelectedVideoFile?.FilePath == String.Empty)
             {
                 return;
+            }
+            if (SelectedVideoFile?.Video != null && !SelectedVideoFile.Video.Grab() && SelectedVideoFile?.FilePath != String.Empty)
+            {
+                SelectedVideoFile.Video = new VideoCapture(SelectedVideoFile.FilePath);
             }
 
             try
@@ -77,11 +81,6 @@ public partial class MainView : UserControl
                 CurrentFrame ??= new Mat();
 
                 var frameDelay = SelectedVideoFile.DeltaFrameTime ?? 0d;
-                if (double.IsNaN(frameDelay) || double.IsInfinity(frameDelay) || frameDelay <= 0)
-                {
-                    frameDelay = 33d;
-                }
-
                 while (IsPlaying && currentVideo == SelectedVideoFile)
                 {
                     if (!currentVideo.Video.Read(CurrentFrame) || CurrentFrame.IsEmpty)
@@ -174,7 +173,7 @@ public partial class MainView : UserControl
         playButton.Content = "Play";
         if (SelectedVideoFile != null)
         {
-            SelectedVideoFile.Video.Set(CapProp.PosMsec, 0);
+            SelectedVideoFile.Video.Set(CapProp.PosMsec, 0.0);
         }
     }
 
@@ -201,7 +200,7 @@ public partial class MainView : UserControl
                 Thread Export = new Thread(() =>
                 {
                     for (int i = 0; i < TotalFrames; i++)
-                    {
+                    {to
                         Mat frame = new Mat();
                         SelectedVideoFile.Set(CapProp.PosFrames, i);
                         SelectedVideoFile.Read(frame);
@@ -398,7 +397,7 @@ public partial class MainView : UserControl
             if (WebCamVideo == null)
             {
                 //Invoke(new Action(() => { képkockákLementéseToolStripMenuItem.Enabled = false; }));
-                WebCamVideo = new VideoCaptureInfo( new VideoCapture(), true);
+                WebCamVideo = new VideoCaptureInfo( new VideoCapture(), true, String.Empty);
                 //FrameWidth = Convert.ToInt32(WebCamVideo.Get(CapProp.FrameWidth));
                 //FrameHeight = Convert.ToInt32(WebCamVideo.Get(CapProp.FrameHeight));
                 WebCamVideo.Video.ImageGrabbed += WebCamVideo_ImageGrabbed;
@@ -537,7 +536,7 @@ public partial class MainView : UserControl
         IsExported = false;
         if (OpenVideoFile.Count >= 1)
         {
-            SelectedVideoFile = new VideoCaptureInfo(new VideoCapture(OpenVideoFile[0].Path.AbsoluteUri), false);
+            SelectedVideoFile = new VideoCaptureInfo(new VideoCapture(OpenVideoFile[0].Path.AbsoluteUri), false, OpenVideoFile[0].Path.AbsoluteUri);
             CurrentFrame = new Mat();
             suppressTrackBarChange = true;
             trackBar1.Minimum = 0;
