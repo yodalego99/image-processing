@@ -10,67 +10,57 @@ namespace ImageProcessingFinal.Views;
 
 public class ViBe
 {
-    int ProcessorCount = Environment.ProcessorCount; // processzormagok száma
     // The fidelity of the background model
-    int N = 20;
+    int _n = 20;
 
     // Distance between two pixels colour in color space
-    int R = 20;
+    int _r = 20;
 
     // Required matches to be added to the background model
-    int BgM_min = 2;
+    int _bgMMin = 2;
 
     // Rate of decay - bigger values tend to cause ghosting
-    int phi = 16;
+    int _phi = 16;
     
-    int FrameWidth, FrameHeight;
-    Image<Bgr, Byte> FrameImage = Mat.Zeros(1, 1, DepthType.Cv8U, 1).ToImage<Bgr, Byte>();
+    int _frameWidth, _frameHeight;
+    Image<Rgba, byte> _frameImage;
 
     // Background model
-    byte[,,,] Samples = new byte[0, 0, 0, 0];
+    byte[,,,] _samples;
     // Segmentation map - result of the ViBe background removal operation
-    private Image<Bgr, Byte> SegMap;
-    byte[,,] FrameImageBytes = new byte[1, 1, 3];
-    byte[,,] SegMapBytes = new byte[1, 1, 3];
-    Mat FrameRead = new Mat();
-    VideoWriter? RemovedBackgroundVideo;
-
-    byte Background = byte.MinValue;
-    byte Foreground = byte.MaxValue;
-
-    bool OnlyBackground = false;
-    bool OnlyForeground = false;
+    private Image<Rgba, byte> _segMap;
+    byte[,,] _frameImageBytes;
+    byte[,,] _segMapBytes;
+    Mat _frameRead;
     
-    double FrameDifferencePercentage = 0.125; // This is the difference between the
+    double _frameDifferencePercentage = 0.125; // This is the difference between the
                                               // previous and current frame if the
                                               // difference is big then we
                                               // reinitialize the background model
-    int MatchCount; // Number of matches
-    bool ShakyCamera = false;   // This indicates, whether the camera shaking detection is on or off
-    byte[,,,] CompareFrames = new byte[1, 1, 3, 2]; // Two consequent frames
-
-    Random rnd = new Random();
+    int _matchCount; // Number of matches
+    bool _shakyCamera = false;   // This indicates, whether the camera shaking detection is on or off
+    byte[,,,] _compareFrames; // Two consequent frames
     private void BackgroundModelInitialization()
     {
-        for (int k = 0; k < N; k++)
+        for (int k = 0; k < _n; k++)
         {
-            Parallel.For(0, ProcessorCount, CPUCoreID =>
+            Parallel.For(0, ProcessorCount, cpuCoreId =>
             {
-                var max = FrameWidth * (CPUCoreID + 1) / ProcessorCount;
-                for (int x = FrameWidth * CPUCoreID / ProcessorCount; x < max; x++)
+                var max = _frameWidth * (cpuCoreId + 1) / ProcessorCount;
+                for (int x = _frameWidth * cpuCoreId / ProcessorCount; x < max; x++)
                 {
-                    for (int y = 0; y < FrameHeight; y++)
+                    for (int y = 0; y < _frameHeight; y++)
                     {
-                        if (ShakyCamera)
+                        if (_shakyCamera)
                         {
-                            CompareFrames[x, y, 0, 0] = FrameImageBytes[y, x, 0];
-                            CompareFrames[x, y, 0, 1] = FrameImageBytes[y, x, 1];
-                            CompareFrames[x, y, 0, 2] = FrameImageBytes[y, x, 2];
+                            _compareFrames[x, y, 0, 0] = _frameImageBytes[y, x, 0];
+                            _compareFrames[x, y, 0, 1] = _frameImageBytes[y, x, 1];
+                            _compareFrames[x, y, 0, 2] = _frameImageBytes[y, x, 2];
                         }
 
-                        Samples[x, y, k, 0] = FrameImageBytes[y, x, 0];
-                        Samples[x, y, k, 1] = FrameImageBytes[y, x, 1];
-                        Samples[x, y, k, 2] = FrameImageBytes[y, x, 2];
+                        _samples[x, y, k, 0] = _frameImageBytes[y, x, 0];
+                        _samples[x, y, k, 1] = _frameImageBytes[y, x, 1];
+                        _samples[x, y, k, 2] = _frameImageBytes[y, x, 2];
                     }
                 }
             });
@@ -79,49 +69,49 @@ public class ViBe
 
     private void BackgroundModelUpdate(int i)
     {
-        Parallel.For(0, ProcessorCount, CPUCoreID =>
+        Parallel.For(0, ProcessorCount, cpuCoreId =>
         {
-            var max = FrameWidth * (CPUCoreID + 1) / ProcessorCount;
-            for (int x = FrameWidth * CPUCoreID / ProcessorCount; x < max; x++)
+            var max = _frameWidth * (cpuCoreId + 1) / ProcessorCount;
+            for (int x = _frameWidth * cpuCoreId / ProcessorCount; x < max; x++)
             {
-                for (int y = 0; y < FrameHeight; y++)
+                for (int y = 0; y < _frameHeight; y++)
                 {
                     int count = 0;
                     int index = 0;
                     int db, dg, dr = 0;
-                    if (i % 2 == 0 && i != 0 && ShakyCamera)
+                    if (i % 2 == 0 && i != 0 && _shakyCamera)
                     {
-                        CompareFrames[x, y, 0, 0] = FrameImageBytes[y, x, 0];
-                        CompareFrames[x, y, 0, 1] = FrameImageBytes[y, x, 1];
-                        CompareFrames[x, y, 0, 2] = FrameImageBytes[y, x, 2];
-                        if ((0.11d * CompareFrames[x, y, 0, 0] + 0.59d * CompareFrames[x, y, 0, 1] +
-                             0.3d * CompareFrames[x, y, 0, 2]) == (0.11d * CompareFrames[x, y, 1, 0] +
-                                                                   0.59d * CompareFrames[x, y, 1, 1] +
-                                                                   0.3d * CompareFrames[x, y, 1, 2]))
+                        _compareFrames[x, y, 0, 0] = _frameImageBytes[y, x, 0];
+                        _compareFrames[x, y, 0, 1] = _frameImageBytes[y, x, 1];
+                        _compareFrames[x, y, 0, 2] = _frameImageBytes[y, x, 2];
+                        if ((0.11d * _compareFrames[x, y, 0, 0] + 0.59d * _compareFrames[x, y, 0, 1] +
+                             0.3d * _compareFrames[x, y, 0, 2]) == (0.11d * _compareFrames[x, y, 1, 0] +
+                                                                   0.59d * _compareFrames[x, y, 1, 1] +
+                                                                   0.3d * _compareFrames[x, y, 1, 2]))
                         {
-                            MatchCount++;
+                            _matchCount++;
                         }
                     }
-                    else if (i % 2 == 1 && ShakyCamera)
+                    else if (i % 2 == 1 && _shakyCamera)
                     {
-                        CompareFrames[x, y, 1, 0] = FrameImageBytes[y, x, 0];
-                        CompareFrames[x, y, 1, 1] = FrameImageBytes[y, x, 1];
-                        CompareFrames[x, y, 1, 2] = FrameImageBytes[y, x, 2];
-                        if ((0.11d * CompareFrames[x, y, 0, 0] + 0.59d * CompareFrames[x, y, 0, 1] +
-                             0.3d * CompareFrames[x, y, 0, 2]) == (0.11d * CompareFrames[x, y, 1, 0] +
-                                                                   0.59d * CompareFrames[x, y, 1, 1] +
-                                                                   0.3d * CompareFrames[x, y, 1, 2]))
+                        _compareFrames[x, y, 1, 0] = _frameImageBytes[y, x, 0];
+                        _compareFrames[x, y, 1, 1] = _frameImageBytes[y, x, 1];
+                        _compareFrames[x, y, 1, 2] = _frameImageBytes[y, x, 2];
+                        if ((0.11d * _compareFrames[x, y, 0, 0] + 0.59d * _compareFrames[x, y, 0, 1] +
+                             0.3d * _compareFrames[x, y, 0, 2]) == (0.11d * _compareFrames[x, y, 1, 0] +
+                                                                   0.59d * _compareFrames[x, y, 1, 1] +
+                                                                   0.3d * _compareFrames[x, y, 1, 2]))
                         {
-                            MatchCount++;
+                            _matchCount++;
                         }
                     }
 
-                    while ((count < BgM_min) && (index < N))
+                    while ((count < _bgMMin) && (index < _n))
                     {
-                        db = (int)Math.Abs(FrameImageBytes[y, x, 0] - Samples[x, y, index, 0]);
-                        dg = (int)Math.Abs(FrameImageBytes[y, x, 1] - Samples[x, y, index, 1]);
-                        dr = (int)Math.Abs(FrameImageBytes[y, x, 2] - Samples[x, y, index, 2]);
-                        if (db < R && dg < R && dr < R)
+                        db = (int)Math.Abs(_frameImageBytes[y, x, 0] - _samples[x, y, index, 0]);
+                        dg = (int)Math.Abs(_frameImageBytes[y, x, 1] - _samples[x, y, index, 1]);
+                        dr = (int)Math.Abs(_frameImageBytes[y, x, 2] - _samples[x, y, index, 2]);
+                        if (db < _r && dg < _r && dr < _r)
                         {
                             count++;
                         }
@@ -129,99 +119,95 @@ public class ViBe
                         index++;
                     }
 
-                    if (count >= BgM_min)
+                    if (count >= _bgMMin)
                     {
                         if (OnlyBackground)
                         {
-                            SegMapBytes[y, x, 0] = FrameImageBytes[y, x, 0];
-                            SegMapBytes[y, x, 1] = FrameImageBytes[y, x, 1];
-                            SegMapBytes[y, x, 2] = FrameImageBytes[y, x, 2];
+                            _segMapBytes[y, x, 0] = _frameImageBytes[y, x, 0];
+                            _segMapBytes[y, x, 1] = _frameImageBytes[y, x, 1];
+                            _segMapBytes[y, x, 2] = _frameImageBytes[y, x, 2];
                         }
                         else
                         {
-                            SegMapBytes[y, x, 0] = Background;
-                            SegMapBytes[y, x, 1] = Background;
-                            SegMapBytes[y, x, 2] = Background;
+                            _segMapBytes[y, x, 0] = byte.MinValue;
+                            _segMapBytes[y, x, 1] = byte.MinValue;
+                            _segMapBytes[y, x, 2] = byte.MinValue;
                         }
 
-                        int rand = rnd.Next(0, phi - 1);
+                        int rand = _rnd.Next(0, _phi - 1);
                         if (rand == 0)
                         {
-                            rand = rnd.Next(0, N - 1);
-                            Samples[x, y, rand, 0] = FrameImageBytes[y, x, 0];
-                            Samples[x, y, rand, 1] = FrameImageBytes[y, x, 1];
-                            Samples[x, y, rand, 2] = FrameImageBytes[y, x, 2];
+                            rand = _rnd.Next(0, _n - 1);
+                            _samples[x, y, rand, 0] = _frameImageBytes[y, x, 0];
+                            _samples[x, y, rand, 1] = _frameImageBytes[y, x, 1];
+                            _samples[x, y, rand, 2] = _frameImageBytes[y, x, 2];
                         }
 
-                        rand = rnd.Next(0, phi - 1);
+                        rand = _rnd.Next(0, _phi - 1);
                         if (rand == 0)
                         {
-                            int xNG, yNG;
-                            rand = rnd.Next(0, N - 1);
-                            xNG = getRandomNghbPixel(x);
-                            yNG = getRandomNghbPixel(y);
-                            Samples[xNG, yNG, rand, 0] = FrameImageBytes[y, x, 0];
-                            Samples[xNG, yNG, rand, 1] = FrameImageBytes[y, x, 1];
-                            Samples[xNG, yNG, rand, 2] = FrameImageBytes[y, x, 2];
+                            int xNg, yNg;
+                            rand = _rnd.Next(0, _n - 1);
+                            xNg = GetRandomNeighbourPixel(x);
+                            yNg = GetRandomNeighbourPixel(y);
+                            _samples[xNg, yNg, rand, 0] = _frameImageBytes[y, x, 0];
+                            _samples[xNg, yNg, rand, 1] = _frameImageBytes[y, x, 1];
+                            _samples[xNg, yNg, rand, 2] = _frameImageBytes[y, x, 2];
                         }
                     }
                     else
                     {
                         if (OnlyForeground)
                         {
-                            SegMapBytes[y, x, 0] = FrameImageBytes[y, x, 0];
-                            SegMapBytes[y, x, 1] = FrameImageBytes[y, x, 1];
-                            SegMapBytes[y, x, 2] = FrameImageBytes[y, x, 2];
+                            _segMapBytes[y, x, 0] = _frameImageBytes[y, x, 0];
+                            _segMapBytes[y, x, 1] = _frameImageBytes[y, x, 1];
+                            _segMapBytes[y, x, 2] = _frameImageBytes[y, x, 2];
                         }
                         else if (OnlyBackground)
                         {
                             if ((x + y) % 2 == 0)
                             {
-                                SegMapBytes[y, x, 0] = 255;
-                                SegMapBytes[y, x, 1] = 0;
-                                SegMapBytes[y, x, 2] = 255;
+                                _segMapBytes[y, x, 0] = byte.MaxValue;
+                                _segMapBytes[y, x, 1] = byte.MinValue;
+                                _segMapBytes[y, x, 2] = byte.MaxValue;
                             }
                             else
                             {
-                                SegMapBytes[y, x, 0] = Background;
-                                SegMapBytes[y, x, 1] = Background;
-                                SegMapBytes[y, x, 2] = Background;
+                                _segMapBytes[y, x, 0] = byte.MinValue;
+                                _segMapBytes[y, x, 1] = byte.MinValue;
+                                _segMapBytes[y, x, 2] = byte.MinValue;
                             }
                         }
                         else
                         {
-                            SegMapBytes[y, x, 0] = Foreground;
-                            SegMapBytes[y, x, 1] = Foreground;
-                            SegMapBytes[y, x, 2] = Foreground;
+                            _segMapBytes[y, x, 0] = byte.MaxValue;
+                            _segMapBytes[y, x, 1] = byte.MaxValue;
+                            _segMapBytes[y, x, 2] = byte.MaxValue;
                         }
                     }
                 }
             }
         });
-        if ((double)(MatchCount) / (double)(FrameWidth * FrameHeight) < FrameDifferencePercentage && ShakyCamera)
+        if ((double)(_matchCount) / (double)(_frameWidth * _frameHeight) < _frameDifferencePercentage && _shakyCamera)
         {
             BackgroundModelInitialization();
         }
 
-        MatchCount = 0;
+        _matchCount = 0;
     }
-    private int getRandomNghbPixel(int coord)
+    private int GetRandomNeighbourPixel(int coord)
     {
-        int[] Var = { -1, 0, 1 };
+        int[] var = [-1, 0, 1];
 
-        Random rnd = new Random();
+        var rnd = new Random();
 
-        if (coord == (FrameHeight - 1) || (coord == FrameWidth - 1))
-        {
-            return coord;
-        }
-        else if (coord == 0)
+        if (coord == (_frameHeight - 1) || (coord == _frameWidth - 1) || coord == 0)
         {
             return coord;
         }
         else
         {
-            return coord + Var[rnd.Next(3)];
+            return coord + var[rnd.Next(3)];
         }
     }
 }
